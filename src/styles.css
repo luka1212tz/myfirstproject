@@ -20,3 +20,49 @@
 @media(max-width:540px){.booking-filters{grid-template-columns:1fr}.booking-table{min-width:620px}.booking-table-wrap{overflow-x:auto}}
 
 .service-photo{display:block;width:100%;height:142px;object-fit:cover;margin:0 0 16px;border-radius:2px}
+
+/* SHXAP orange + purple visual refresh */
+:root{--ink:#291b38;--muted:#766b80;--green:#7540a1;--green-dark:#4d2475;--cream:#fff8f1;--paper:#fffdfb;--line:#eadff0;--sand:#f7dfcb;--rust:#ef8a35;font-family:Arial,Helvetica,sans-serif;color:var(--ink);background:var(--cream)}
+body{background:var(--cream);color:var(--ink)}
+.topline{background:#4d2475;color:#fff1e4}
+.topline a{color:#ffc58d}
+.site-header{background:rgba(255,248,241,.97);border-bottom-color:#eadff0}
+.brand-mark,.process-mark{background:#fce4cf;color:#783b9e}
+.brand-light{color:#8a6b9e}
+.brand small{color:#9a7eaa}
+.main-nav button{color:#614875}
+.main-nav button:hover,.service-link,.social-links a,.text-link{color:#d66d19}
+.button-dark{background:#5b2d83;color:#fff}
+.button-dark:hover{background:#743da0}
+.button:focus-visible,a:focus-visible,button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible{outline-color:#ef8a35}
+.intro-band{background:#512a78}
+.intro-signature{color:#ffc58d}
+.intro-signature svg{color:#ff9b45}
+.section-heading h2,.faq-title h2,.location-copy h2,.why-heading h2{color:#321d45}
+.service-card{border-color:#eadff0;background:#fffdfb}
+.service-icon{background:#f1e5f8;color:#70409a}
+.service-icon-1{background:#ffead8;color:#c7661e}
+.service-icon-2{background:#eee3f5;color:#7540a1}
+.service-meta strong{color:#5a2c7d}
+.why-section{background:#f7eadd}
+.why-grid article{border-left-color:#ead1bd}
+.why-icon{color:#d87525}
+.process-icon{color:#7540a1;background:#f1e5f8}
+.gallery-section{background:#f4e8f7}
+.gallery-tile>span{color:#5b2d83}
+.reviews-section{background:#fff8f1}
+.review-card{background:#fffdfb;border-color:#eadff0}
+.stars{color:#e98a31}
+.pricing-section{padding:92px 0 100px;background:#fff8f1}
+.pricing-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px}
+.pricing-card{background:#fff;border:1px solid #eadff0;border-radius:14px;padding:25px 26px;box-shadow:0 8px 26px rgba(75,35,102,.045)}
+.pricing-card-kicker{font-size:9px;letter-spacing:.16em;font-weight:800;color:#d87525}
+.pricing-card h3{font-size:22px;line-height:1.3;color:#512a78;margin:12px 0}
+.pricing-desc{font-size:12px;line-height:1.75;color:#796d82;margin:0 0 16px}
+.pricing-card ul{list-style:none;padding:0;margin:0}
+.pricing-card li{display:flex;justify-content:space-between;align-items:flex-start;gap:14px;padding:11px 0;border-bottom:1px solid #f0e8f3;font-size:13px;line-height:1.55}
+.pricing-card li span{max-width:78%}
+.pricing-card li strong{color:#d66d19;white-space:nowrap}
+.pricing-card .service-link{margin-top:8px}
+.gallery-grid img{content-visibility:auto}
+@media(max-width:760px){.pricing-grid{grid-template-columns:1fr}.pricing-section{padding:65px 0}.pricing-card{padding:21px 18px}.pricing-card li{font-size:12px}.pricing-card h3{font-size:20px}}
