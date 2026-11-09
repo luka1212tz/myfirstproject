@@ -196,15 +196,18 @@ function BookingForm({ business, services, language, t }: { business: Business; 
   const [petType, setPetType] = useState<'dog'|'cat'>('dog');
   const eligibleServices = useMemo(() => services.filter((service) => service.animal_type === 'both' || service.animal_type === petType), [services, petType]);
   const [serviceId, setServiceId] = useState('');
+  const [selectedPrice, setSelectedPrice] = useState<{ category: string; item: string; price: string } | null>(null);
   const [date, setDate] = useState('');
   const [time, setTime] = useState('');
   const [slots, setSlots] = useState<string[]>([]);
   const [slotsLoading, setSlotsLoading] = useState(false);
   const [formError, setFormError] = useState('');
   const [sending, setSending] = useState(false);
-  const [sent, setSent] = useState<{ bookingId: string; whatsappUrl: string } | null>(null);
-  const [form, setForm] = useState({ petName: '', breed: '', weight: '', fullName: '', phone: '', email: '', notes: '' });
+  const [sent, setSent] = useState<{ bookingId: string; whatsappUrl: string; customerEmailSent: boolean; ownerEmailSent: boolean } | null>(null);
+  const [form, setForm] = useState({ petName: '', breed: '', weight: '', puppyAge: '', fullName: '', phone: '', email: '', notes: '' });
   const selectedService = eligibleServices.find((service) => service.id === serviceId);
+  const weightNumber = Number(form.weight);
+  const weightIsReady = petType === 'dog' && form.weight.trim() !== '' && Number.isFinite(weightNumber) && weightNumber > 0 && weightNumber <= 250;
 
   useEffect(() => {
     if (!eligibleServices.some((service) => service.id === serviceId)) setServiceId('');
@@ -224,56 +227,118 @@ function BookingForm({ business, services, language, t }: { business: Business; 
 
   function update(key: keyof typeof form, value: string) {
     setForm((current) => ({ ...current, [key]: value }));
+    if (key === 'weight' || key === 'puppyAge' || key === 'breed') {
+      setSelectedPrice(null);
+      setServiceId('');
+      setDate('');
+      setTime('');
+    }
+  }
+
+  function choosePrice(categoryTitle: string, item: string, price: string) {
+    const service = eligibleServices.find((entry) => entry.name.trim().toLocaleLowerCase() === categoryTitle.trim().toLocaleLowerCase());
+    if (!service) {
+      setFormError(`სერვისი „${categoryTitle}“ ჯერ არ არის აქტიური ადმინისტრატორის პანელში. გთხოვთ, დაუკავშირდეთ სალონს.`);
+      return;
+    }
+    setFormError('');
+    setSelectedPrice({ category: categoryTitle, item, price });
+    setServiceId(service.id);
+    setDate('');
+    setTime('');
+  }
+
+  function hygienePrice(weight: number) {
+    if (weight <= 4) return { label: 'ძაღლები, ≤4 კგ', price: '50 ₾' };
+    if (weight <= 7) return { label: 'ძაღლები, ≤7 კგ', price: '55 ₾' };
+    if (weight <= 14) return { label: 'ძაღლები, ≤14 კგ', price: '65 ₾' };
+    return { label: 'ძაღლები, >14 კგ', price: '100+ ₾' };
   }
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault(); setFormError(''); setSending(true);
+    if (petType === 'dog' && !selectedPrice) {
+      setFormError('ჯერ მიუთითეთ წონა და აირჩიეთ სასურველი მომსახურება და ფასი.');
+      setSending(false);
+      return;
+    }
     const whatsappWindow = business.whatsappNumber ? window.open('about:blank', '_blank') : null;
     try {
-      const result = await api<{ bookingId: string; status: string; serviceName: string }>('/api/bookings', {
+      const priceSelection = selectedPrice ? `${selectedPrice.category} — ${selectedPrice.item} (${selectedPrice.price})` : '';
+      const result = await api<{ bookingId: string; status: string; serviceName: string; customerEmailSent: boolean; ownerEmailSent: boolean }>('/api/bookings', {
         method: 'POST',
-        body: JSON.stringify({ ...form, animalType: petType, serviceId, date, time, weight: form.weight }),
+        body: JSON.stringify({ ...form, animalType: petType, serviceId, date, time, weight: form.weight, priceSelection }),
       });
       const message = [
         'Hello! I would like to request an appointment at SHXAP GROOMING.',
-        `Pet: ${form.petName} (${petType})`, `Breed: ${form.breed || 'Not specified'}`,
-        `Service: ${result.serviceName}`, `Date: ${date}`, `Time: ${time}`,
-        `Customer: ${form.fullName}`, `Phone: ${form.phone}`,
+        `Pet: ${form.petName} (${petType})`, `Weight: ${form.weight || 'Not provided'} kg`, `Breed: ${form.breed || 'Not specified'}`,
+        `Service: ${result.serviceName}`, priceSelection ? `Selected price: ${priceSelection}` : '',
+        `Date: ${date}`, `Time: ${time}`, `Customer: ${form.fullName}`, `Phone: ${form.phone}`, `Email: ${form.email}`,
         form.notes ? `Additional information: ${form.notes}` : '',
         `Request ID: ${result.bookingId}`, 'Please confirm availability.',
       ].filter(Boolean).join('\n');
       const whatsappUrl = business.whatsappNumber ? `https://wa.me/${business.whatsappNumber}?text=${encodeURIComponent(message)}` : '';
       if (whatsappWindow && whatsappUrl) whatsappWindow.location.href = whatsappUrl;
       else whatsappWindow?.close();
-      setSent({ bookingId: result.bookingId, whatsappUrl });
+      setSent({ bookingId: result.bookingId, whatsappUrl, customerEmailSent: result.customerEmailSent, ownerEmailSent: result.ownerEmailSent });
     } catch (error) {
       whatsappWindow?.close();
       setFormError(error instanceof Error ? error.message : 'Could not send your request.');
     } finally { setSending(false); }
   }
 
-  if (sent) return <div className="booking-form booking-success"><div className="success-icon"><Check size={30}/></div><div className="eyebrow"><span className="eyebrow-line"/> {t('bookingSuccess')}</div><h3>{t('bookingSuccessText')}</h3><p className="booking-id">Request ID · {sent.bookingId}</p>{sent.whatsappUrl ? <a className="button button-dark" href={sent.whatsappUrl} target="_blank" rel="noreferrer">{t('openWhatsapp')} <ArrowUpRight size={16}/></a> : <p className="whatsapp-note">{t('noWhatsapp')}</p>}<button className="text-link" onClick={() => { setSent(null); setDate(''); setTime(''); setForm({petName:'',breed:'',weight:'',fullName:'',phone:'',email:'',notes:''}); }}>{language === 'ka' ? 'ახალი მოთხოვნის შექმნა' : language === 'ru' ? 'Создать новый запрос' : 'Make another request'} <ArrowRight size={15}/></button></div>;
+  if (sent) return <div className="booking-form booking-success"><div className="success-icon"><Check size={30}/></div><div className="eyebrow"><span className="eyebrow-line"/> {t('bookingSuccess')}</div><h3>{t('bookingSuccessText')}</h3><p className="booking-id">Request ID · {sent.bookingId}</p>{sent.whatsappUrl ? <a className="button button-dark" href={sent.whatsappUrl} target="_blank" rel="noreferrer">{t('openWhatsapp')} <ArrowUpRight size={16}/></a> : <p className="whatsapp-note">{t('noWhatsapp')}</p>}<p className={`email-confirmation-note ${sent.customerEmailSent ? 'email-sent' : 'email-not-sent'}`}>{sent.customerEmailSent ? 'მოთხოვნის მიღების წერილი გამოგეგზავნათ მითითებულ ელფოსტაზე. ვიზიტი დადასტურდება სალონის პასუხის შემდეგ.' : 'მოთხოვნა შენახულია, მაგრამ ელფოსტის გაგზავნა ვერ მოხერხდა. გადაამოწმეთ ელფოსტა ან დაგვიკავშირდით ტელეფონით.'}</p>{!sent.ownerEmailSent && <p className="email-warning">სალონის ელფოსტაზე შეტყობინება ვერ გაიგზავნა; მოთხოვნა მაინც შენახულია ადმინისტრატორის პანელში.</p>}<button className="text-link" onClick={() => { setSent(null); setDate(''); setTime(''); setServiceId(''); setSelectedPrice(null); setForm({petName:'',breed:'',weight:'',puppyAge:'',fullName:'',phone:'',email:'',notes:''}); }}>{language === 'ka' ? 'ახალი მოთხოვნის შექმნა' : language === 'ru' ? 'Создать новый запрос' : 'Make another request'} <ArrowRight size={15}/></button></div>;
+
+  const hygiene = weightIsReady ? hygienePrice(weightNumber) : null;
+  const dogCategories = pricingGroups.map((group, index) => ({
+    ...group,
+    index,
+    options: index === 1 && hygiene ? [[hygiene.label, hygiene.price] as [string, string]] : group.items as [string, string][],
+  }));
 
   return <form className="booking-form" onSubmit={submit}>
-    <div className="form-topline"><span>01 / 02</span><span>{t('appointmentRequest')}</span></div>
-    <details className="booking-price-list"><summary>სრული ფასების სია <span>ნახვა / დამალვა</span></summary><div className="booking-price-groups">{pricingGroups.map((group) => <section key={group.title}><h4>{group.title}</h4>{group.desc && <p>{group.desc}</p>}<ul>{group.items.map(([label, price]) => <li key={label}><span>{label}</span><strong>{price}</strong></li>)}</ul></section>)}</div></details>
+    <div className="form-topline"><span>01 / 03</span><span>{t('appointmentRequest')}</span></div>
     {formError && <div className="form-error" role="alert">{formError}</div>}
     <div className="form-grid">
-      <label className="field field-wide"><span>{t('petType')} *</span><div className="pet-toggle"><button type="button" className={petType === 'dog' ? 'selected' : ''} onClick={() => setPetType('dog')}><Dog size={17}/>{t('dog')}</button><button type="button" className={petType === 'cat' ? 'selected' : ''} onClick={() => setPetType('cat')}><Cat size={17}/>{t('cat')}</button></div></label>
-      <label className="field"><span>{t('service')} *</span><select required value={serviceId} onChange={(event) => setServiceId(event.target.value)}><option value="">{t('chooseService')}</option>{eligibleServices.map((service) => <option key={service.id} value={service.id}>{service.name} · {service.price ? `from ${service.price} ₾ · ` : ''}{service.duration_minutes} min</option>)}</select></label>
-      <label className="field"><span>{t('petName')} *</span><input required maxLength={60} value={form.petName} onChange={(event) => update('petName', event.target.value)} placeholder="Max" /></label>
-      <label className="field"><span>{t('breed')}</span><input maxLength={100} value={form.breed} onChange={(event) => update('breed', event.target.value)} placeholder="Golden Retriever" /></label>
-      <label className="field"><span>{t('weight')}</span><input type="number" min="0.1" max="250" step="0.1" value={form.weight} onChange={(event) => update('weight', event.target.value)} placeholder="12" /></label>
-      <label className="field"><span>{t('date')} *</span><input type="date" required min={localToday()} value={date} onChange={(event) => setDate(event.target.value)} disabled={!serviceId}/></label>
+      <label className="field field-wide"><span>{t('petType')} *</span><div className="pet-toggle"><button type="button" className={petType === 'dog' ? 'selected' : ''} onClick={() => { setPetType('dog'); setSelectedPrice(null); setServiceId(''); setDate(''); setTime(''); }}>{<Dog size={17}/>}{t('dog')}</button><button type="button" className={petType === 'cat' ? 'selected' : ''} onClick={() => { setPetType('cat'); setSelectedPrice(null); setServiceId(''); setDate(''); setTime(''); }}>{<Cat size={17}/>}{t('cat')}</button></div></label>
+      {petType === 'dog' ? <>
+        <label className="field field-wide booking-weight-field"><span>ძაღლის წონა (კგ) *</span><input required type="number" min="0.1" max="250" step="0.1" value={form.weight} onChange={(event) => update('weight', event.target.value)} placeholder="მაგ. 6.5" inputMode="decimal"/><small className="field-hint">მიუთითეთ წონა — ამის შემდეგ გამოჩნდება შესაფერისი მომსახურებები და ფასები.</small></label>
+        <label className="field"><span>{t('petName')} *</span><input required maxLength={60} value={form.petName} onChange={(event) => update('petName', event.target.value)} placeholder="Max" /></label>
+        <label className="field"><span>{t('breed')} *</span><input required maxLength={100} value={form.breed} onChange={(event) => update('breed', event.target.value)} placeholder="მაგ. პუდელი" /></label>
+        <label className="field"><span>ლეკვის ასაკი (თვე), თუ 6 თვეზე ნაკლებია</span><input type="number" min="1" max="72" step="1" value={form.puppyAge} onChange={(event) => update('puppyAge', event.target.value)} placeholder="მაგ. 4"/></label>
+        {weightIsReady ? <div className="booking-catalog field-wide">
+          <div className="booking-catalog-heading"><span className="eyebrow-line"/><div><strong>აირჩიეთ მომსახურება</strong><small>წონა: {weightNumber} კგ · აირჩიეთ კონკრეტული ჯიში / ზომა და ფასი</small></div></div>
+          <div className="booking-catalog-list">{dogCategories.map((group) => {
+            const isPuppy = group.index === 0;
+            const puppyAllowed = form.puppyAge.trim() !== '' && Number(form.puppyAge) > 0 && Number(form.puppyAge) <= 6;
+            const isDisabled = isPuppy && !puppyAllowed;
+            return <section className={`booking-catalog-card ${selectedPrice?.category === group.title ? 'catalog-selected' : ''} ${isDisabled ? 'catalog-disabled' : ''}`} key={group.title}>
+              <div className="booking-catalog-card-head"><div><span className="catalog-number">0{group.index + 1} / SHXAP GROOMING</span><h4>{group.title}</h4>{group.desc && <p>{group.desc}</p>}</div>{selectedPrice?.category === group.title && <span className="catalog-check"><Check size={15}/></span>}</div>
+              {isPuppy && !puppyAllowed && <p className="catalog-hint">ამ სერვისისთვის მიუთითეთ ლეკვის ასაკი — 6 თვემდე.</p>}
+              <div className="catalog-price-options">{group.options.map(([label, price]) => {
+                const isChoice = selectedPrice?.category === group.title && selectedPrice.item === label;
+                return <button type="button" className={`catalog-price-option ${isChoice ? 'option-selected' : ''}`} key={label} disabled={isDisabled} aria-pressed={isChoice} onClick={() => choosePrice(group.title, label, price)}><span>{label}</span><strong>{price}</strong>{isChoice && <Check size={15}/>}</button>;
+              })}</div>
+            </section>;
+          })}</div>
+        </div> : <div className="weight-prompt field-wide"><Dog size={20}/><span>შეიყვანეთ ძაღლის წონა, რომ გამოჩნდეს დასაჯავშნი მომსახურებები.</span></div>}
+      </> : <>
+        <label className="field"><span>{t('petName')} *</span><input required maxLength={60} value={form.petName} onChange={(event) => update('petName', event.target.value)} placeholder="Max" /></label>
+        <label className="field"><span>{t('breed')}</span><input maxLength={100} value={form.breed} onChange={(event) => update('breed', event.target.value)} /></label>
+        <label className="field"><span>{t('weight')}</span><input type="number" min="0.1" max="250" step="0.1" value={form.weight} onChange={(event) => update('weight', event.target.value)} /></label>
+        <label className="field field-wide"><span>{t('service')} *</span><select required value={serviceId} onChange={(event) => { setServiceId(event.target.value); setSelectedPrice(null); }}><option value="">{t('chooseService')}</option>{eligibleServices.map((service) => <option key={service.id} value={service.id}>{service.name} · {service.duration_minutes} min</option>)}</select></label>
+        {!eligibleServices.length && <p className="field-hint field-wide">კატების მომსახურებებზე ფასისა და ჩაწერისთვის დაგვიკავშირდით ტელეფონით.</p>}
+      </>}
+      <label className="field field-wide"><span>{t('date')} *</span><input type="date" required min={localToday()} value={date} onChange={(event) => setDate(event.target.value)} disabled={!serviceId}/></label>
       <label className="field"><span>{t('time')} *</span><select required value={time} onChange={(event) => setTime(event.target.value)} disabled={!date || !serviceId || slotsLoading}><option value="">{t('chooseTime')}</option>{slots.map((slot) => <option key={slot} value={slot}>{slot}</option>)}</select>{slotsLoading && <small className="field-hint">{t('loadingSlots')}</small>}{date && serviceId && !slotsLoading && !slots.length && <small className="field-hint">{t('noSlots')}</small>}</label>
       <div className="form-divider"><span>{t('yourDetails')}</span></div>
       <label className="field"><span>{t('fullName')} *</span><input required minLength={2} maxLength={100} value={form.fullName} onChange={(event) => update('fullName', event.target.value)} autoComplete="name" /></label>
       <label className="field"><span>{t('phone')} *</span><input required type="tel" minLength={7} maxLength={30} value={form.phone} onChange={(event) => update('phone', event.target.value)} autoComplete="tel" placeholder="+995 5XX XX XX XX" /></label>
-      <label className="field field-wide"><span>Email for booking updates *</span><input required type="email" maxLength={254} value={form.email} onChange={(event) => update('email', event.target.value)} autoComplete="email" placeholder="you@example.com" /></label>
+      <label className="field field-wide email-required-field"><span>ელფოსტა — აქ გამოგეგზავნებათ ჩაწერის სტატუსი *</span><input required type="email" maxLength={254} value={form.email} onChange={(event) => update('email', event.target.value)} autoComplete="email" placeholder="თქვენი ელფოსტა, მაგ. name@gmail.com"/><small className="field-hint">ელფოსტა სავალდებულოა, რომ მიიღოთ მოთხოვნის მიღებისა და დადასტურების შეტყობინებები.</small></label>
       <label className="field field-wide"><span>{t('notes')}</span><textarea rows={3} maxLength={1000} value={form.notes} onChange={(event) => update('notes', event.target.value)} placeholder={t('notesPlaceholder')}/></label>
     </div>
-    <div className="booking-submit-row"><button className="button button-dark" type="submit" disabled={sending || !selectedService || !time}>{sending ? t('submitting') : t('submit')} <ArrowUpRight size={16}/></button><span><ShieldCheck size={15}/> {t('privacy')}</span></div>
-    {!services.length && <div className="no-service-note">{t('noDetails')}</div>}
+    <div className="booking-submit-row"><button className="button button-dark" type="submit" disabled={sending || !selectedService || !time || (petType === 'dog' && !selectedPrice)}>{sending ? t('submitting') : t('submit')} <ArrowUpRight size={16}/></button><span><ShieldCheck size={15}/> {t('privacy')}</span></div>
+    {!services.length && <div className="no-service-note">სერვისების სიის ჩატვირთვა ვერ მოხერხდა. გთხოვთ, სცადოთ მოგვიანებით ან დაგვიკავშირდეთ.</div>}
   </form>;
 }
 

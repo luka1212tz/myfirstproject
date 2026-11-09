@@ -71,11 +71,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (action === 'booking.status') {
       const status = String(body.status ?? '');
       if (!BOOKING_STATUSES.includes(status)) return json(res, 400, { error: 'Invalid booking status.' });
-      const rows = await sql`UPDATE bookings b SET status = ${status}, updated_at = now() FROM customers c, pets p, services s WHERE b.id = ${String(body.id)} AND c.id=b.customer_id AND p.id=b.pet_id AND s.id=b.service_id RETURNING b.id, c.full_name, c.email, p.name AS pet_name, s.name AS service_name, b.starts_at`;
+      const rows = await sql`UPDATE bookings b SET status = ${status}, updated_at = now() FROM customers c, pets p, services s WHERE b.id = ${String(body.id)} AND c.id=b.customer_id AND p.id=b.pet_id AND s.id=b.service_id RETURNING b.id, c.full_name, c.email, p.name AS pet_name, p.breed, p.approximate_weight, s.name AS service_name, b.customer_note, b.starts_at`;
       if (!rows.length) return json(res, 404, { error: 'Booking not found.' });
       if (['confirmed','rejected'].includes(status) && rows[0].email && process.env.RESEND_API_KEY) {
         const row = rows[0]; const when = new Date(row.starts_at).toLocaleString('en-GB',{timeZone:'Asia/Tbilisi'});
-        await sendStatusEmail(String(row.email), String(row.full_name), String(row.pet_name), String(row.service_name), when, status);
+        await sendStatusEmail(String(row.email), String(row.full_name), String(row.pet_name), String(row.service_name), when, status, `${row.breed || ''} · ${row.approximate_weight ?? '—'} kg\n${row.customer_note || ''}`);
       }
       return json(res, 200, { ok: true });
     }
@@ -200,11 +200,18 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 }
 
-async function sendStatusEmail(to:string, name:string, pet:string, service:string, when:string, status:string) {
+async function sendStatusEmail(to:string, name:string, pet:string, service:string, when:string, status:string, details:string): Promise<boolean> {
   const confirmed = status === 'confirmed';
   const subject = confirmed ? 'Your SHXAP GROOMING appointment is confirmed' : 'Update about your SHXAP GROOMING booking';
-  const html = `<h2>${confirmed ? 'Appointment confirmed' : 'Booking not confirmed'}</h2><p>Hello ${safe(name)},</p><p>Your booking for ${safe(pet)} (${safe(service)}) on ${safe(when)} is ${confirmed ? 'confirmed' : 'not confirmed'}.</p>${confirmed ? '<p>We look forward to seeing you!</p>' : '<p>Please contact the salon to discuss another time.</p>'}`;
-  const response = await fetch('https://api.resend.com/emails',{method:'POST',headers:{Authorization:`Bearer ${process.env.RESEND_API_KEY}`,'Content-Type':'application/json'},body:JSON.stringify({from:process.env.RESEND_FROM_EMAIL || 'SHXAP GROOMING <onboarding@resend.dev>',to:[to],subject,html})});
-  if (!response.ok) console.error('Booking status email failed:',response.status,await response.text());
+  const html = `<h2>${confirmed ? 'Appointment confirmed' : 'Booking not confirmed'}</h2><p>Hello ${safe(name)},</p><p>Your booking for ${safe(pet)} (${safe(service)}) on ${safe(when)} is ${confirmed ? 'confirmed' : 'not confirmed'}.</p><p>Pet / price details:<br>${safe(details).replace(/\n/g, '<br>')}</p>${confirmed ? '<p>We look forward to seeing you!</p>' : '<p>Please contact the salon to discuss another time.</p>'}`;
+  try {
+    const response = await fetch('https://api.resend.com/emails',{method:'POST',headers:{Authorization:`Bearer ${process.env.RESEND_API_KEY}`,'Content-Type':'application/json'},body:JSON.stringify({from:process.env.RESEND_FROM_EMAIL || 'SHXAP GROOMING <onboarding@resend.dev>',to:[to],subject,html})});
+    if (!response.ok) console.error('Booking status email failed:',response.status,await response.text());
+    return response.ok;
+  } catch (error) {
+    console.error('Booking status email error:', error);
+    return false;
+  }
 }
+
 function safe(value:string) { return value.replace(/[&<>\"']/g,(c)=>({'&':'&amp;','<':'&lt;','>':'&gt;','\"':'&quot;',"'":'&#39;'}[c]||c)); }
