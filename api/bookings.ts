@@ -9,6 +9,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const input = bodyObject(req);
   const fullName = cleanText(input.fullName, 100);
   const phone = cleanText(input.phone, 30).replace(/[\s()-]/g, '');
+  const customerEmail = cleanText(input.email, 254).toLowerCase();
   const petName = cleanText(input.petName, 60);
   const animalType = String(input.animalType ?? '');
   const breed = cleanText(input.breed, 100);
@@ -16,9 +17,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const serviceId = String(input.serviceId ?? '');
   const date = String(input.date ?? '');
   const time = String(input.time ?? '');
-  const notes = cleanText(input.notes, 1000);
+  const customerNotes = cleanText(input.notes, 1000);
+  const priceSelection = cleanText(input.priceSelection, 300);
+  const puppyAge = input.puppyAge === '' || input.puppyAge == null ? null : Number(input.puppyAge);
+  const notes = [priceSelection ? `შერჩეული მომსახურება და ფასი: ${priceSelection}` : '', puppyAge ? `ლეკვის ასაკი: ${puppyAge} თვე` : '', customerNotes ? `დამატებითი ინფორმაცია: ${customerNotes}` : ''].filter(Boolean).join('\n').slice(0, 1400);
 
-  if (fullName.length < 2 || !/^\+?[0-9]{7,15}$/.test(phone) || petName.length < 1 || !['dog', 'cat'].includes(animalType) || !/^[0-9a-f-]{36}$/i.test(serviceId) || !validDate(date) || !validTime(time)) {
+  if (fullName.length < 2 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(customerEmail) || !/^\+?[0-9]{7,15}$/.test(phone) || petName.length < 1 || !['dog', 'cat'].includes(animalType) || !/^[0-9a-f-]{36}$/i.test(serviceId) || !validDate(date) || !validTime(time) || (animalType === 'dog' && (weight === null || !priceSelection)) || (puppyAge !== null && (!Number.isFinite(puppyAge) || puppyAge < 1 || puppyAge > 72)) || (priceSelection.startsWith('ლეკვების კომპლექსი') && !(puppyAge !== null && puppyAge <= 6))) {
     return json(res, 400, { error: 'Please complete the required booking fields with valid information.' });
   }
   if (weight !== null && (!Number.isFinite(weight) || weight <= 0 || weight > 250)) return json(res, 400, { error: 'Enter a valid approximate pet weight.' });
@@ -70,9 +74,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     // One data-modifying CTE keeps customer, pet and booking creation atomic.
     const bookingRows = await sql`
       WITH saved_customer AS (
-        INSERT INTO customers (full_name, phone)
-        VALUES (${fullName}, ${phone})
-        ON CONFLICT (phone) DO UPDATE SET full_name = EXCLUDED.full_name, updated_at = now()
+        INSERT INTO customers (full_name, phone, email)
+        VALUES (${fullName}, ${phone}, ${customerEmail})
+        ON CONFLICT (phone) DO UPDATE SET full_name = EXCLUDED.full_name, email = EXCLUDED.email, updated_at = now()
         RETURNING id
       ), saved_pet AS (
         INSERT INTO pets (customer_id, name, animal_type, breed, approximate_weight, notes)
@@ -86,7 +90,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       )
       SELECT id, status FROM saved_booking`;
 
-    return json(res, 201, { bookingId: bookingRows[0].id, status: bookingRows[0].status, serviceName: service.name, durationMinutes: duration });
+    const bookingId = String(bookingRows[0].id);
+    const ownerEmailSent = await sendBookingEmail({ to: process.env.BOOKING_NOTIFICATION_EMAIL || process.env.OWNER_EMAIL || '', subject: 'New SHXAP GROOMING booking', html: `<h2>New booking request</h2><p>${escapeHtml(fullName)} · ${escapeHtml(phone)}</p><p>Customer email: ${escapeHtml(customerEmail)}</p><p>Pet: ${escapeHtml(petName)} (${escapeHtml(animalType)}) · ${escapeHtml(breed)} · ${weight ?? 'Weight not provided'} kg</p>${puppyAge ? `<p>Puppy age: ${puppyAge} months</p>` : ''}<p>Service category: ${escapeHtml(service.name)}</p><p>Selected option / price: ${escapeHtml(priceSelection || 'Not specified')}</p><p>Date: ${escapeHtml(date)} at ${escapeHtml(time)}</p><p>Notes: ${escapeHtml(customerNotes || 'None')}</p><p>Booking ID: ${bookingId}</p><p>Review it in /admin.</p>` });
+    const customerEmailSent = await sendBookingEmail({ to: customerEmail, subject: 'SHXAP GROOMING received your booking request', html: `<h2>Booking request received</h2><p>Hello ${escapeHtml(fullName)},</p><p>We received your request for ${escapeHtml(petName)} on ${escapeHtml(date)} at ${escapeHtml(time)}.</p><p>Service: ${escapeHtml(service.name)}</p><p>Selected option / price: ${escapeHtml(priceSelection || 'To be confirmed by the salon')}</p><p>Dog weight: ${weight ?? 'Not provided'} kg</p><p>Your appointment is <strong>pending confirmation</strong>. The salon will contact you when its status changes.</p><p>Reference: ${bookingId}</p>` });
+    return json(res, 201, { bookingId, status: bookingRows[0].status, serviceName: service.name, durationMinutes: duration, ownerEmailSent, customerEmailSent });
   } catch (error: any) {
     if (error?.code === '23P01' || error?.constraint === 'bookings_no_active_overlap') {
       return json(res, 409, { error: 'That time has just been booked. Please choose another time.' });
@@ -95,3 +102,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return json(res, 500, { error: 'Your request could not be saved. Please try again or contact the salon.' });
   }
 }
+
+async function sendBookingEmail(message: {to:string; subject:string; html:string}): Promise<boolean> {
+  if (!message.to || !process.env.RESEND_API_KEY) { console.warn('Booking email skipped: configure RESEND_API_KEY and recipient email.'); return false; }
+  try {
+    const response = await fetch('https://api.resend.com/emails', { method:'POST', headers:{ Authorization:`Bearer ${process.env.RESEND_API_KEY}`, 'Content-Type':'application/json' }, body:JSON.stringify({ from:process.env.RESEND_FROM_EMAIL || 'SHXAP GROOMING <onboarding@resend.dev>', to:[message.to], subject:message.subject, html:message.html }) });
+    if (!response.ok) { console.error('Resend email failed:', response.status, await response.text()); return false; }
+    return true;
+  } catch (error) { console.error('Booking email error:', error); return false; }
+}
+function escapeHtml(value:string) { return value.replace(/[&<>\"']/g, (character) => ({'&':'&amp;','<':'&lt;','>':'&gt;','\"':'&quot;',"'":'&#39;'}[character] || character)); }

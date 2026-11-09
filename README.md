@@ -97,7 +97,21 @@ The public booking calendar uses the salon's local `Asia/Tbilisi` time. It displ
 
 `vercel.json` handles `/admin`, `/sitemap.xml` and `/robots.txt`. The sitemap and robots output use `SITE_URL`, the Vercel production URL, or the deployment host. Set `SITE_URL` to your canonical public domain for best SEO results.
 
-## 8. Image uploads
+## 8. Booking email notifications
+
+The public booking form asks the customer for a required email address. On submission, the API emails the salon and the customer; when the booking is marked Confirmed or Rejected in `/admin`, it emails the customer again.
+
+Add these Vercel environment variables and redeploy:
+
+- `RESEND_API_KEY` — private Resend API key (server-side only).
+- `BOOKING_NOTIFICATION_EMAIL` — the salon inbox that should receive new booking notices.
+- `RESEND_FROM_EMAIL` — sender address authorised by Resend, e.g. `SHXAP GROOMING <bookings@your-verified-domain.com>`.
+
+For initial testing only, Resend's `onboarding@resend.dev` sender is restricted to the verified account recipient. Sending to arbitrary customers requires a domain you own and verify in Resend. Do not put an API key in frontend code or Git.
+
+If your existing Neon database was created before customer email was added, run `database/migration-booking-email.sql` once in the Neon SQL Editor.
+
+## 9. Image uploads
 
 To enable uploads from the dashboard:
 
