@@ -10,20 +10,20 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     // Older versions seeded all categories only when the entire services table was empty,
     // which left customers with a pricing list but no matching booking options.
     const defaults = [
-      ['ლეკვების კომპლექსი (6 თვემდე)', 'ლეკვების მოვლა; ფასები ჯიშის მიხედვით: 50–55 ₾', 50, 90, 0],
-      ['ჰიგიენური კომპლექსი', 'ჰიგიენური მოვლა; ფასი წონის მიხედვით: 50–100+ ₾', 50, 60, 1],
-      ['შეკრეჭა', 'შეკრეჭა; ფასი ჯიშისა და ზომის მიხედვით: 70–130 ₾', 70, 120, 2],
-      ['შეკრეჭა: ჯიშები', 'ჯიშების მიხედვით შეკრეჭა: 60–130 ₾', 60, 120, 3],
-      ['სხვა ჯიშები', 'ფასი ბეწვის სიგრძის, სტრუქტურისა და დახვეულობის მიხედვით: 70–100 ₾', 70, 120, 4],
+      ['ლეკვების კომპლექსი (6 თვემდე)', 'ლეკვების მოვლა; იორკშირის ტერიერი, ში-ტცუ და მალტური ბოლონკა — 50 ₾; პუდელი, ბიშონ ფრიზე, მალტიპუ და შპიცი — 55 ₾', 50, 90, 0],
+      ['ჰიგიენური კომპლექსი', 'ჰიგიენური მოვლა; ფასი წონის მიხედვით: 50 ₾, 55 ₾, 65 ₾ ან 100+ ₾', 50, 60, 1],
+      ['შეკრეჭა', 'შეკრეჭა ჯიშისა და ზომის მიხედვით: 70–85 ₾', 70, 120, 2],
+      ['შეკრეჭა: ჯიშები', 'ჯიშების მიხედვით შეკრეჭა: 65–130 ₾', 65, 120, 3],
+      ['სხვა ჯიშები', 'ფასი ბეწვის სიგრძის, სტრუქტურისა და დახვეულობის მიხედვით: 75–100 ₾', 75, 120, 4],
       ['ტრიმინგი', 'ტრიმინგი და სრული მოვლა: 80–105 ₾', 80, 120, 5],
     ];
     for (const [name, description, price, duration, order] of defaults) {
-      const matching = await sql`SELECT id, is_active FROM services WHERE name = ${name} AND animal_type = 'dog' LIMIT 1`;
+      const matching = await sql`SELECT id FROM services WHERE name = ${name} AND animal_type = 'dog' LIMIT 1`;
       if (!matching.length) {
         await sql`INSERT INTO services (name, description, animal_type, price, duration_minutes, is_active, sort_order) VALUES (${name}, ${description}, 'dog', ${price}, ${duration}, true, ${order})`;
-      } else if (!matching[0].is_active) {
-        // These six supplied price categories are specifically requested as public booking options.
-        await sql`UPDATE services SET is_active = true WHERE id = ${matching[0].id}`;
+      } else {
+        // Keep the database-backed service cards in sync with the current published price list.
+        await sql`UPDATE services SET description = ${description}, price = ${price}, duration_minutes = ${duration}, is_active = true, sort_order = ${order} WHERE id = ${matching[0].id}`;
       }
     }
     const [settings, services, gallery, testimonials, faqs, hours] = await Promise.all([
