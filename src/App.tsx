@@ -92,7 +92,7 @@ function App() {
     <div className="site-shell">
       <div className="topline"><span><MapPin size={13} /> {t('batumi')}</span><span>{t('topLine')}</span><a href={business.mapsUrl} target="_blank" rel="noreferrer">{t('findMaps')} <ArrowUpRight size={12}/></a></div>
       <header className="site-header">
-        <a className="brand" href="#top" aria-label="SHXAP GROOMING home"><span className="brand-mark"><PawPrint size={23}/></span><span>SHXAP<span className="brand-light"> GROOMING</span><small>BATUMI · GEORGIA</small></span></a>
+        <a className="brand" href="#top" aria-label="SHXAP GROOMING home"><span className="brand-mark"><img src="/shower-grooming-logo.png" alt="Shower Grooming logo" /></span><span>SHXAP<span className="brand-light"> GROOMING</span><small>BATUMI · GEORGIA</small></span></a>
         <nav className={`main-nav ${mobileMenu ? 'nav-open' : ''}`}>
           <button onClick={() => scrollTo('services')}>{t('navServices')}</button>
           <button onClick={() => scrollTo('about')}>{t('navAbout')}</button>
@@ -116,28 +116,10 @@ function App() {
             <div className="hero-actions"><button className="button button-dark" onClick={() => scrollTo('booking')}>{t('book')} <ArrowUpRight size={16}/></button><button className="text-link" onClick={() => scrollTo('services')}>{t('explore')} <ArrowDown size={15}/></button></div>
             <div className="hero-note"><span className="note-icon"><Heart size={16}/></span><span>{t('heroNote')} <small>{t('heroNoteSub')}</small></span></div>
           </div>
-          <div className="hero-visual" aria-label="Illustration of a happy pet, created for the SHXAP GROOMING website">
+          <div className="hero-visual" aria-label="Shower Grooming official logo">
             <div className="hero-visual-backdrop"/>
             <div className="hero-stamp"><span>{t('stampTop')}</span><PawPrint size={21}/><span>{t('stampBottom')}</span></div>
-            <svg className="pet-portrait" viewBox="0 0 520 560" role="img" aria-label="Decorative illustration of a fluffy dog">
-              <defs><clipPath id="portraitClip"><circle cx="260" cy="270" r="220"/></clipPath></defs>
-              <g clipPath="url(#portraitClip)">
-                <circle cx="260" cy="270" r="220" fill="#d6a57d"/>
-                <path d="M80 150 C35 75 4 100 25 220 C36 285 92 310 135 275Z" fill="#76513f"/>
-                <path d="M440 150 C485 75 516 100 495 220 C484 285 428 310 385 275Z" fill="#76513f"/>
-                <path d="M115 185 C115 90 180 60 260 65 C340 60 405 90 405 185 L410 350 C390 475 330 505 260 505 C190 505 130 475 110 350Z" fill="#f1e3cf"/>
-                <path d="M155 260 C135 220 159 188 194 195 C224 202 230 237 214 268 C194 293 172 288 155 260Z" fill="#fff8ec"/>
-                <path d="M305 260 C290 220 310 188 345 195 C375 202 385 237 365 268 C345 293 322 288 305 260Z" fill="#fff8ec"/>
-                <ellipse cx="192" cy="260" rx="12" ry="17" fill="#2c2925"/><ellipse cx="338" cy="260" rx="12" ry="17" fill="#2c2925"/>
-                <circle cx="196" cy="254" r="4" fill="#fff"/><circle cx="342" cy="254" r="4" fill="#fff"/>
-                <ellipse cx="260" cy="338" rx="48" ry="35" fill="#3d302a"/>
-                <path d="M260 367 C248 397 218 400 202 380 M260 367 C272 397 302 400 318 380" fill="none" stroke="#7c5345" strokeWidth="8" strokeLinecap="round"/>
-                <path d="M113 343 C140 312 171 313 192 347 C216 384 179 423 146 402 C124 388 104 365 113 343Z" fill="#fff8ec"/>
-                <path d="M407 343 C380 312 349 313 328 347 C304 384 341 423 374 402 C396 388 416 365 407 343Z" fill="#fff8ec"/>
-                <path d="M160 118 C181 79 216 89 230 125 C207 151 177 153 160 118Z M290 124 C305 87 344 82 360 120 C345 152 310 154 290 124Z" fill="#fff8ec"/>
-                <path d="M150 450 C197 489 323 489 370 450 L410 560 L110 560Z" fill="#55766a"/>
-              </g>
-            </svg>
+            <img className="pet-portrait hero-logo" src="/shower-grooming-logo.png" alt="Shower Grooming — official dog and cat grooming logo" />
             <div className="hero-side-card"><span className="side-card-icon"><Sparkles size={19}/></span><span>{t('madeFor')}<br/><strong>{t('bestDays')}</strong></span></div>
             <div className="hero-number">01 <span>/ 03</span></div>
           </div>
@@ -184,7 +166,7 @@ function App() {
         <section className="location-section" id="location"><div className="section-wrap location-layout"><div className="location-copy"><div className="eyebrow"><span className="eyebrow-line"/>{t('locationKicker')}</div><h2>{t('locationTitle')}</h2><div className="location-address"><MapPin size={20}/><span>{t('address')}</span></div>{(business.phone || business.email || business.whatsappNumber) && <div className="location-contact">{business.phone && <a href={`tel:${business.phone}`}><Phone size={16}/>{business.phone}</a>}{business.email && <a href={`mailto:${business.email}`}>{business.email}</a>}{business.whatsappNumber && <a href={`https://wa.me/${business.whatsappNumber}`} target="_blank" rel="noreferrer"><MessageCircle size={16}/>{t('whatsapp')}</a>}</div>}<div className="hours-block"><h3>{t('openingHours')}</h3>{hours.some((hour) => hour.is_open) ? hours.map((hour) => <div className="hours-row" key={hour.weekday}><span>{weekdays[language][hour.weekday]}</span><strong>{hour.is_open ? `${String(hour.open_time).slice(0,5)} – ${String(hour.close_time).slice(0,5)}` : t('closed')}</strong></div>) : <p>{t('hoursUnknown')}</p>}</div><a className="button button-dark location-button" href={business.mapsUrl} target="_blank" rel="noreferrer">{t('directions')} <ArrowUpRight size={16}/></a></div><div className="map-frame"><iframe title={t('mapTitle')} src={`https://www.google.com/maps?q=place_id:${business.placeId}&output=embed`} loading="lazy" referrerPolicy="no-referrer-when-downgrade" allowFullScreen/><div className="map-caption"><span><MapPin size={15}/> SHXAP GROOMING</span><a href={business.mapsUrl} target="_blank" rel="noreferrer">{t('openMaps')} <ArrowUpRight size={13}/></a></div></div></div></section>
       </main>
 
-      <footer className="site-footer"><div className="section-wrap footer-main"><a className="brand brand-footer" href="#top"><span className="brand-mark"><PawPrint size={23}/></span><span>SHXAP<span className="brand-light"> GROOMING</span><small>BATUMI · GEORGIA</small></span></a><p>{t('footerLine')}</p><div className="footer-social"><a href={business.instagram} target="_blank" rel="noreferrer" aria-label="Instagram"><Instagram/></a><a href={business.tiktok} target="_blank" rel="noreferrer" aria-label="TikTok"><span>♪</span></a></div></div><div className="section-wrap footer-bottom"><span>© {new Date().getFullYear()} SHXAP GROOMING. All rights reserved.</span><span><a href="/admin">{t('admin')}</a><span className="footer-dot"/>{t('batumi')}</span></div></footer>
+      <footer className="site-footer"><div className="section-wrap footer-main"><a className="brand brand-footer" href="#top"><span className="brand-mark"><img src="/shower-grooming-logo.png" alt="Shower Grooming logo" /></span><span>SHXAP<span className="brand-light"> GROOMING</span><small>BATUMI · GEORGIA</small></span></a><p>{t('footerLine')}</p><div className="footer-social"><a href={business.instagram} target="_blank" rel="noreferrer" aria-label="Instagram"><Instagram/></a><a href={business.tiktok} target="_blank" rel="noreferrer" aria-label="TikTok"><span>♪</span></a></div></div><div className="section-wrap footer-bottom"><span>© {new Date().getFullYear()} SHXAP GROOMING. All rights reserved.</span><span><a href="/admin">{t('admin')}</a><span className="footer-dot"/>{t('batumi')}</span></div></footer>
 
       {siteError && <div className="site-warning" role="status">{t('siteWarning')}</div>}
       {lightbox && <div className="lightbox" role="dialog" aria-modal="true" onClick={() => setLightbox(null)}><button onClick={() => setLightbox(null)} aria-label="Close image"><X/></button><img src={lightbox.image_url} alt={lightbox.alt_text}/></div>}
